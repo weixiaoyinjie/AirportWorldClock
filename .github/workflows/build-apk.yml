@@ -1,0 +1,66 @@
+
+name: AirportWorldClock APK Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract source ZIP
+        shell: bash
+        run: |
+          set -e
+          if [ ! -f settings.gradle ]; then
+            ZIP=$(find . -maxdepth 1 -iname "*.zip" -type f | head -1)
+            if [ -z "$ZIP" ]; then
+              echo "Source ZIP not found"
+              exit 1
+            fi
+            mkdir -p extracted
+            unzip -q "$ZIP" -d extracted
+            if [ -f extracted/settings.gradle ]; then
+              cp -a extracted/. .
+            elif [ -f extracted/AirportWorldClock/settings.gradle ]; then
+              cp -a extracted/AirportWorldClock/. .
+            else
+              echo "Android project not found"
+              exit 1
+            fi
+          fi
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirportWorldClock-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
